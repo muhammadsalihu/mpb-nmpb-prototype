@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>NMPB File Platform — Prototype</title>
+<title>NMPB Archive Platform — Prototype</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
@@ -76,11 +76,67 @@
   .kv .k { color:#6b7280; font-weight:600; }
   .sigline { margin-top:12px; padding:10px 14px; background:#f9fafb; border:1px solid #e5e7eb; border-radius:9px; font-size:11.5px; color:#6b7280; display:flex; align-items:center; gap:10px; }
   .sigline img { height:34px; }
+
+@media (max-width:820px){
+  body{font-size:14px;}
+  header{padding:10px 14px;flex-wrap:wrap;gap:8px;}
+  header .brand{font-size:14px;}
+  .demo{order:9;flex-basis:100%;text-align:center;}
+  nav{padding:0 8px;position:static;overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  nav button{padding:11px 12px;font-size:12.5px;white-space:nowrap;flex-shrink:0;}
+  main{padding:18px 14px 60px;}
+  h1{font-size:20px;}
+  .sub{font-size:12.5px;}
+  .cols2{grid-template-columns:1fr;}
+  .stats{grid-template-columns:repeat(2,1fr);}
+  .stat .v{font-size:22px;}
+  table{display:block;overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch;}
+  .modal{padding:16px;width:94vw;}
+  .kv{grid-template-columns:1fr;gap:2px 0;}
+  .kv .k{margin-top:6px;}
+  canvas.sig{width:100% !important;height:160px;}
+  .searchrow{flex-wrap:wrap;}
+  .searchrow input{max-width:none;flex:1 1 100%;}
+  .tl .t{width:88px;}
+  .grid2{grid-template-columns:1fr;}
+  .mrow{flex-wrap:wrap;}
+}
 </style>
 </head>
 <body>
+
+<!-- access gate -->
+<style>
+#gate{position:fixed;inset:0;background:#0f1f3d;display:flex;align-items:center;justify-content:center;z-index:9999;padding:20px;}
+#gate .gcard{background:#fff;border-radius:14px;padding:30px 26px;width:360px;max-width:100%;text-align:center;font-family:'Inter',sans-serif;}
+#gate .glogo{width:48px;height:48px;border-radius:12px;background:#2563eb;color:#fff;display:flex;align-items:center;justify-content:center;font-size:22px;margin:0 auto 14px;}
+#gate h2{font-size:17px;font-weight:800;color:#111827;margin-bottom:6px;}
+#gate p{font-size:12px;color:#6b7280;margin-bottom:16px;line-height:1.5;}
+#gate input{width:100%;padding:11px 13px;border:1px solid #d1d5db;border-radius:9px;font-size:14px;margin-bottom:10px;box-sizing:border-box;text-align:center;}
+#gate button{width:100%;padding:11px;background:#2563eb;color:#fff;border:none;border-radius:9px;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit;}
+#gate .gerr{color:#b91c1c;font-size:12px;margin-top:8px;min-height:15px;}
+</style>
+<div id="gate"><div class="gcard">
+  <div class="glogo">📁</div>
+  <h2>NMPB Archive Platform</h2>
+  <p>Protected demo. Enter the access password shared by the project team.</p>
+  <input id="gpass" type="password" placeholder="Access password" autocomplete="off">
+  <button onclick="gateTry()">Unlock</button>
+  <div class="gerr" id="gerr"></div>
+</div></div>
+<script>
+async function gateTry(){
+  const v=document.getElementById('gpass').value;
+  const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(v));
+  const hex=[...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join('');
+  if(hex==='f555f9e5addc0092fc8942c942da1b092245dbb5c82611fade2ab7b8d648da9a'){sessionStorage.setItem('nmpbGate','ok');document.getElementById('gate').remove();}
+  else{document.getElementById('gerr').textContent='Incorrect password — try again.';}
+}
+(function(){if(sessionStorage.getItem('nmpbGate')==='ok'){var g=document.getElementById('gate');if(g)g.remove();}
+document.getElementById('gpass').addEventListener('keydown',function(e){if(e.key==='Enter')gateTry();});})();
+</script>
 <header>
-  <div class="brand"><div class="logo">📁</div><div>NMPB File Platform<small>PROTOTYPE · MPB PROJECT 2</small></div></div>
+  <div class="brand"><div class="logo">📁</div><div>NMPB Archive Platform<small>PROTOTYPE · MPB PROJECT 2</small></div></div>
   <div class="spacer"></div>
   <span class="demo">Demo mode — switch role &amp; office below</span>
   <select id="roleSel" title="Acting role"></select>
@@ -357,11 +413,46 @@ window.checkout = function(rid){
 };
 
 /* ================= REQUESTS ================= */
+let reqQuery='';
+window.openNewRequest = function(){
+  const avail=S.files.filter(f=>f.status==='available');
+  if(!avail.length){ toast('No files are currently available to request'); return; }
+  openModal(`<h2>Request a file</h2><div class="msub">Pick the file, say who needs it and why — a Director must sign before it is released.</div>
+    <label>File *</label><select class="f" id="rq-file">${avail.map(f=>`<option value="${esc(f.serviceNo)}">${esc(f.serviceNo)} — ${esc(f.title)} (${esc(f.current)})</option>`).join('')}</select>
+    <label>Requester name *</label><input class="f" id="rq-name" placeholder="Officer name">
+    <label>Receiving office</label><select class="f" id="rq-office">${OFFICES.map(o=>`<option ${o===office?'selected':''}>${o}</option>`).join('')}</select>
+    <label>Purpose *</label><textarea class="f" id="rq-purpose" rows="2" placeholder="Why is this file needed?"></textarea>
+    <div class="mrow"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn primary" onclick="submitRequest(document.getElementById('rq-file').value)">Submit request</button></div>`);
+};
 function renderRequests(){
-  const rows=S.requests;
+  const q=reqQuery.toLowerCase();
+  const rows=S.requests.filter(r=>!q || (r.id+' '+r.serviceNo+' '+r.requester+' '+r.office+' '+r.purpose+' '+r.status).toLowerCase().includes(q));
+  let trackHtml='';
+  const exact=S.requests.find(r=>r.id.toLowerCase()===q) || (q && S.requests.filter(r=>r.serviceNo.toLowerCase()===q).sort((a,b)=>b.at-a.at)[0]);
+  if(exact){
+    const f=fileBySn(exact.serviceNo);
+    const tl=S.movements.filter(m=>m.serviceNo===exact.serviceNo);
+    trackHtml=`<div class="panel" style="margin-bottom:16px;border-left:4px solid #2563eb;">
+      <h3>📍 Live tracking — ${esc(f.serviceNo)} · ${esc(f.title)}</h3>
+      <div class="kv" style="grid-template-columns:150px 1fr;">
+        <span class="k">Request</span><span><b>${esc(exact.id)}</b> by ${esc(exact.requester)} (${esc(exact.office)}) — “${esc(exact.purpose)}”</span>
+        <span class="k">Status</span><span>${statusBadge(f.status)} ${isOverdue(f)?` <b class="late">overdue ${dwell(lastOut(f).at)} ⚠</b>`:''}</span>
+        <span class="k">Current office</span><span>${esc(f.current)}</span>
+        <span class="k">Holder</span><span>${esc(f.holder||'—')}</span>
+      </div>
+      <h3 style="font-size:12px;">Movement trail</h3>
+      <ul class="tl">${tl.map(m=>`<li><span class="t">${fmt(m.at)}</span><span class="act">${esc(m.action)}</span><span>${m.from!=='—'?esc(m.from)+' → ':''}${esc(m.to)} <span style="color:#9ca3af;">· ${esc(m.by)}</span></span></li>`).join('')||'<li><span>No movements yet.</span></li>'}</ul>
+      <div class="mrow"><button class="btn sm" onclick="openFile('${f.serviceNo}')">Open full file record</button></div>
+    </div>`;
+  }
   $('#app').innerHTML = `
-    <h1>Requests &amp; Signatures</h1>
-    <div class="sub">Request → Director signature gate → release. ${role==='director'?'You are viewing as <b>Director</b> — sign pending requests below.':''}</div>
+    <h1>Requests &amp; Tracking</h1>
+    <div class="sub">Request a file, then track it live — every step from request to Director signature to return.</div>
+    <div class="searchrow">
+      <input id="tq" placeholder="Track a file — enter request ID (R-1001) or service number (N-2045)…" value="${esc(reqQuery)}">
+      ${role!=='director' ? `<button class="btn primary" onclick="openNewRequest()">＋ Request a file</button>`:''}
+    </div>
+    ${trackHtml}
     <div class="panel"><table>
       <tr><th>Request</th><th>File</th><th>Requester</th><th>Office</th><th>Purpose</th><th>Status</th><th></th></tr>
       ${rows.map(r=>`<tr>
@@ -373,7 +464,9 @@ function renderRequests(){
         <td>${ r.status==='pending' && role==='director' ? `<button class="btn sm amber" onclick="openSign('${r.id}')">✍️ Approve &amp; Sign</button>`
               : r.status==='signed' && (role==='registry'||role==='staff') ? `<button class="btn sm green" onclick="checkout('${r.id}')">🚚 Check out</button>` : '' }</td>
       </tr>`).join('')}
+      ${rows.length?'':'<tr><td colspan="7"><div class="empty">No requests match.</div></td></tr>'}
     </table></div>`;
+  $('#tq').oninput = e => { reqQuery=e.target.value; renderRequests(); const v=$('#tq'); v.focus(); v.setSelectionRange(v.value.length,v.value.length); };
 }
 
 /* ================= MOVEMENT LOG ================= */
